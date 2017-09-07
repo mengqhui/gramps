@@ -209,7 +209,7 @@ class ListView(NavigationView):
         self.edit_action.add_actions([
                 ('Add', 'list-add', _("_Add..."), "<PRIMARY>Insert",
                     self.ADD_MSG, self.add),
-                ('Remove', 'list-remove', _("_Remove"), "<PRIMARY>Delete",
+                ('Remove', 'list-remove', _("_Delete"), "<PRIMARY>Delete",
                     self.DEL_MSG, self.remove),
                 ('Merge', 'gramps-merge', _('_Merge...'), None,
                     self.MERGE_MSG, self.merge),
@@ -907,7 +907,7 @@ class ListView(NavigationView):
             self.edit(obj)
             return True
         # Custom interactive search
-        if event.string:
+        if Gdk.keyval_to_unicode(event.keyval):
             return self.searchbox.treeview_keypress(obj, event)
         return False
 
@@ -935,7 +935,7 @@ class ListView(NavigationView):
                     else:
                         self.edit(obj)
                         return True
-        elif event.string:
+        elif Gdk.keyval_to_unicode(event.keyval):
             # Custom interactive search
             return self.searchbox.treeview_keypress(obj, event)
         return False

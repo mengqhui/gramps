@@ -26,7 +26,6 @@
 #-------------------------------------------------------------------------
 import psycopg2
 import re
-import os
 
 #-------------------------------------------------------------------------
 #
@@ -34,6 +33,7 @@ import os
 #
 #-------------------------------------------------------------------------
 from gramps.gen.db.dbconst import ARRAYSIZE
+from gramps.gen.const import GRAMPS_LOCALE as glocale
 
 psycopg2.paramstyle = 'format'
 
@@ -57,14 +57,30 @@ class Postgresql:
         self.__connection = psycopg2.connect(*args, **kwargs)
         self.__connection.autocommit = True
         self.__cursor = self.__connection.cursor()
-        locale = os.environ.get('LANG', 'en_US.utf8')
-        self.execute("DROP COLLTAION IF EXISTS glocale")
-        self.execute("CREATE COLLATION glocale (LOCALE = '%s')" % locale)
+        self.check_collation(glocale)
+
+    def check_collation(self, locale):
+        """
+        Checks that a collation exists and if not creates it.
+
+        :param locale: Locale to be checked.
+        :param type: A GrampsLocale object.
+        """
+        # Duplicating system collations works, but to delete them the schema
+        # must be specified, so get the current schema
+        self.execute('SELECT current_schema()')
+        current_schema, = self.fetchone()
+        collation = locale.get_collation()
+        self.execute('DROP COLLATION IF EXISTS "%s"."%s"'
+                     % (current_schema, collation))
+        self.execute('CREATE COLLATION "%s"'
+                     "(LOCALE = '%s')" % (collation, locale.collation))
 
     def _hack_query(self, query):
         query = query.replace("?", "%s")
         query = query.replace("REGEXP", "~")
         query = query.replace("desc", "desc_")
+        query = query.replace("BLOB", "bytea")
         ## LIMIT offset, count
         ## count can be -1, for all
         ## LIMIT -1
@@ -114,7 +130,7 @@ class Postgresql:
     def table_exists(self, table):
         self.__cursor.execute("SELECT COUNT(*) "
                               "FROM information_schema.tables "
-                              "WHERE table_name=?;", [table])
+                              "WHERE table_name=%s;", [table])
         return self.fetchone()[0] != 0
 
     def close(self):

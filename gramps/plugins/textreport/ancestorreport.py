@@ -88,6 +88,8 @@ class AncestorReport(Report):
         pagebbg   - Whether to include page breaks between generations.
         name_format   - Preferred format to display names
         incl_private  - Whether to include private data
+        namebrk       - Whether a line break should follow the name
+        inc_id        - Whether to include Gramps IDs
         living_people - How to handle living people
         years_past_death - Consider as living this many years after death
         """
@@ -107,10 +109,12 @@ class AncestorReport(Report):
         self.max_generations = menu.get_option_by_name('maxgen').get_value()
         self.pgbrk = menu.get_option_by_name('pagebbg').get_value()
         self.opt_namebrk = menu.get_option_by_name('namebrk').get_value()
+        self.want_ids = menu.get_option_by_name('inc_id').get_value()
+
         pid = menu.get_option_by_name('pid').get_value()
         self.center_person = self.database.get_person_from_gramps_id(pid)
-        if (self.center_person == None) :
-            raise ReportError(_("Person %s is not in the Database") % pid )
+        if self.center_person is None:
+            raise ReportError(_("Person %s is not in the Database") % pid)
 
         stdoptions.run_name_format_option(self, menu)
 
@@ -185,7 +189,7 @@ class AncestorReport(Report):
 
         self.apply_filter(self.center_person.get_handle(), 1)
 
-        # Write the title line. Set in INDEX marker so that this section will be
+        # Write the title line. Set an INDEX mark so that this section will be
         # identified as a major category if this is included in a Book report.
 
         name = self._name_display.display_formal(self.center_person)
@@ -232,15 +236,17 @@ class AncestorReport(Report):
             self.doc.start_bold()
             self.doc.write_text(name.strip(), mark)
             self.doc.end_bold()
+            if self.want_ids:
+                self.doc.write_text(' (%s)' % person.get_gramps_id())
 
             # terminate with a period if it is not already terminated.
             # This can happen if the person's name ends with something 'Jr.'
-            if name[-1:] == '.':
+            if name[-1:] == '.' and not self.want_ids:
                 self.doc.write_text(" ")
             else:
                 self.doc.write_text(". ")
 
-            # Add a line break if requested (not implemented yet)
+            # Add a line break if requested
             if self.opt_namebrk:
                 self.doc.write_text('\n')
 
@@ -286,8 +292,11 @@ class AncestorOptions(MenuReportOptions):
         menu.add_option(category_name, "pid", self.__pid)
 
         maxgen = NumberOption(_("Generations"), 10, 1, 100)
-        maxgen.set_help(_("The number of generations to include in the report"))
+        maxgen.set_help(
+            _("The number of generations to include in the report"))
         menu.add_option(category_name, "maxgen", maxgen)
+
+        stdoptions.add_gramps_id_option(menu, category_name)
 
         pagebbg = BooleanOption(_("Page break between generations"), False)
         pagebbg.set_help(
@@ -295,7 +304,7 @@ class AncestorOptions(MenuReportOptions):
         menu.add_option(category_name, "pagebbg", pagebbg)
 
         namebrk = BooleanOption(_("Add linebreak after each name"), False)
-        namebrk.set_help(_("Indicates if a line break should follow the name."))
+        namebrk.set_help(_("Whether a line break should follow the name."))
         menu.add_option(category_name, "namebrk", namebrk)
 
         category_name = _("Report Options (2)")

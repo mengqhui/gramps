@@ -365,6 +365,7 @@ class RelationshipView(NavigationView):
               <menuitem action="ShareFamilyMenu"/>
               <menuitem action="AddSpouseMenu"/>
               <menuitem action="ChangeOrder"/>
+              <menuitem action="SetActive"/>
               <menuitem action="FilterEdit"/>
             </menu>
             <menu action="BookMenu">
@@ -814,8 +815,8 @@ class RelationshipView(NavigationView):
                 call_fcn = self.add_family
                 del_fcn = self.delete_family
 
-            if not self.toolbar_visible and not self.dbstate.db.readonly:
-                # Show edit-Buttons if toolbar is not visible
+            if not self.dbstate.db.readonly:
+                # Show edit-Buttons only if db is not readonly
                 if self.reorder_sensitive:
                     add = widgets.IconButton(self.reorder_button_press, None,
                                              'view-sort-ascending')
@@ -1541,10 +1542,11 @@ class RelationshipView(NavigationView):
             name.add_surname(Surname())
             name.set_primary_surname(0)
             family = self.dbstate.db.get_family_from_handle(handle)
-            father = self.dbstate.db.get_person_from_handle(
-                                        family.get_father_handle())
-            if father:
-                preset_name(father, name)
+            father_h = family.get_father_handle()
+            if father_h:
+                father = self.dbstate.db.get_person_from_handle(father_h)
+                if father:
+                    preset_name(father, name)
             person.set_primary_name(name)
             try:
                 EditPerson(self.dbstate, self.uistate, [], person,

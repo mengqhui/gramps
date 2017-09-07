@@ -166,7 +166,8 @@ class Test3(U.TestCase):
             self.assertTrue(os.path.isdir(s2), "made dir %r" % s2)
             f = os.path.join(s2,"test_file")
 
-            open(f,"w").write("testing..")
+            with open(f, "w") as fd:
+                fd.write("testing..")
             self.assertTrue(os.path.isfile(f), "file %r exists" % f)
             tu.delete_tree(sub)
             self.assertFalse(os.path.isdir(sub),
@@ -183,29 +184,6 @@ class Test3(U.TestCase):
                 "deltree on %r raises TestError" % (self.home_junk))
         else:
             self.fail("Skip deltree constraint test, no '$HOME' var")
-
-# logging (& misc?)
-class Test4(U.TestCase):
-    logf = "/tmp/__tu__log__"
-
-    def test4a(self):
-        wmsg = "a warning message"
-        emsg = "an error message"
-        import logging
-        # file logging helps with file capture of log-messages
-        tl = tu.TestLogger()
-        for i in (1,2):
-            # 2 passes to test clearing old file
-            tl.logfile_init(self.logf)
-            logging.warn(wmsg)
-            logging.info("nada")
-            logging.error(emsg)
-            ll = tl.logfile_getlines()
-            nl = len(ll)
-            print(repr(ll))
-            self.assertEquals(nl,2,
-                tu.msg(nl,2, "pass %d: expected line count" % i))
-            #del tl
 
 
 if __name__ == "__main__":

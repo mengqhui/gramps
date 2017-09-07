@@ -46,12 +46,12 @@ class RelativesGramplet(Gramplet):
         If person or family changes, the relatives of active person might have
         changed
         """
-        self.dbstate.db.connect('person-add', self.update)
-        self.dbstate.db.connect('person-delete', self.update)
-        self.dbstate.db.connect('family-add', self.update)
-        self.dbstate.db.connect('family-delete', self.update)
-        self.dbstate.db.connect('person-rebuild', self.update)
-        self.dbstate.db.connect('family-rebuild', self.update)
+        self.connect(self.dbstate.db, 'person-add', self.update)
+        self.connect(self.dbstate.db, 'person-delete', self.update)
+        self.connect(self.dbstate.db, 'family-add', self.update)
+        self.connect(self.dbstate.db, 'family-delete', self.update)
+        self.connect(self.dbstate.db, 'person-rebuild', self.update)
+        self.connect(self.dbstate.db, 'family-rebuild', self.update)
 
     def active_changed(self, handle):
         self.update()
@@ -85,7 +85,9 @@ class RelativesGramplet(Gramplet):
                 spouse = database.get_person_from_handle(spouse_handle)
                 spousename = name_displayer.display(spouse)
                 text = "%s" %  spousename
-                self.append_text(_("%d. Partner: ") % (famc))
+                self.append_text(_("%(count)d. %(relation)s: ") %
+                                   {"count": famc,
+                                    "relation": family.get_relationship()})
                 self.link(text, 'Person', spouse_handle)
                 self.append_text("\n")
             else:

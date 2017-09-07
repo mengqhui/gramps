@@ -135,58 +135,47 @@ class DBAPI(DbGeneric):
                            'handle VARCHAR(50) PRIMARY KEY NOT NULL, '
                            'given_name TEXT, '
                            'surname TEXT, '
-                           'gramps_id TEXT, '
                            'blob_data BLOB'
                            ')')
         self.dbapi.execute('CREATE TABLE family '
                            '('
                            'handle VARCHAR(50) PRIMARY KEY NOT NULL, '
-                           'father_handle VARCHAR(50), '
-                           'mother_handle VARCHAR(50), '
-                           'gramps_id TEXT, '
                            'blob_data BLOB'
                            ')')
         self.dbapi.execute('CREATE TABLE source '
                            '('
                            'handle VARCHAR(50) PRIMARY KEY NOT NULL, '
-                           'gramps_id TEXT, '
                            'blob_data BLOB'
                            ')')
         self.dbapi.execute('CREATE TABLE citation '
                            '('
                            'handle VARCHAR(50) PRIMARY KEY NOT NULL, '
-                           'gramps_id TEXT, '
                            'blob_data BLOB'
                            ')')
         self.dbapi.execute('CREATE TABLE event '
                            '('
                            'handle VARCHAR(50) PRIMARY KEY NOT NULL, '
-                           'gramps_id TEXT, '
                            'blob_data BLOB'
                            ')')
         self.dbapi.execute('CREATE TABLE media '
                            '('
                            'handle VARCHAR(50) PRIMARY KEY NOT NULL, '
-                           'gramps_id TEXT, '
                            'blob_data BLOB'
                            ')')
         self.dbapi.execute('CREATE TABLE place '
                            '('
                            'handle VARCHAR(50) PRIMARY KEY NOT NULL, '
                            'enclosed_by VARCHAR(50), '
-                           'gramps_id TEXT, '
                            'blob_data BLOB'
                            ')')
         self.dbapi.execute('CREATE TABLE repository '
                            '('
                            'handle VARCHAR(50) PRIMARY KEY NOT NULL, '
-                           'gramps_id TEXT, '
                            'blob_data BLOB'
                            ')')
         self.dbapi.execute('CREATE TABLE note '
                            '('
                            'handle VARCHAR(50) PRIMARY KEY NOT NULL, '
-                           'gramps_id TEXT, '
                            'blob_data BLOB'
                            ')')
         self.dbapi.execute('CREATE TABLE tag '
@@ -319,21 +308,23 @@ class DBAPI(DbGeneric):
         self.dbapi.commit()
         if not txn.batch:
             # Now, emit signals:
-            for (obj_type_val, txn_type_val) in list(txn):
-                if obj_type_val == REFERENCE_KEY:
-                    continue
-                if txn_type_val == TXNDEL:
-                    handles = [handle for (handle, data) in
-                               txn[(obj_type_val, txn_type_val)]]
-                else:
-                    handles = [handle for (handle, data) in
-                               txn[(obj_type_val, txn_type_val)]
-                               if (handle, None)
-                               not in txn[(obj_type_val, TXNDEL)]]
-                if handles:
-                    signal = KEY_TO_NAME_MAP[
-                        obj_type_val] + action[txn_type_val]
-                    self.emit(signal, (handles, ))
+            # do deletes and adds first
+            for trans_type in [TXNDEL, TXNADD, TXNUPD]:
+                for obj_type in range(11):
+                    if obj_type != REFERENCE_KEY and \
+                            (obj_type, trans_type) in txn:
+                        if trans_type == TXNDEL:
+                            handles = [handle for (handle, data) in
+                                       txn[(obj_type, trans_type)]]
+                        else:
+                            handles = [handle for (handle, data) in
+                                       txn[(obj_type, trans_type)]
+                                       if (handle, None)
+                                       not in txn[(obj_type, TXNDEL)]]
+                        if handles:
+                            signal = KEY_TO_NAME_MAP[
+                                obj_type] + action[trans_type]
+                            self.emit(signal, (handles, ))
         self.transaction = None
         msg = txn.get_description()
         self.undodb.commit(txn, msg)
@@ -410,49 +401,62 @@ class DBAPI(DbGeneric):
         else:
             return key
 
-    def get_person_handles(self, sort_handles=False):
+    def get_person_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Person in
         the database.
 
-        If sort_handles is True, the list is sorted by surnames.
+        :param sort_handles: If True, the list is sorted by surnames.
+        :type sort_handles: bool
+        :param locale: The locale to use for collation.
+        :type locale: A GrampsLocale object.
         """
         if sort_handles:
-            self.dbapi.execute("SELECT handle FROM person "
-                               "ORDER BY surname COLLATE glocale")
+            if locale != glocale:
+                self.dbapi.check_collation(locale)
+
+            self.dbapi.execute('SELECT handle FROM person '
+                               'ORDER BY surname '
+                               'COLLATE "%s"' % locale.get_collation())
         else:
             self.dbapi.execute("SELECT handle FROM person")
         rows = self.dbapi.fetchall()
-        return [bytes(row[0], "utf-8") for row in rows]
+        return [row[0] for row in rows]
 
-    def get_family_handles(self, sort_handles=False):
+    def get_family_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Family in
         the database.
 
-        If sort_handles is True, the list is sorted by surnames.
+        :param sort_handles: If True, the list is sorted by surnames.
+        :type sort_handles: bool
+        :param locale: The locale to use for collation.
+        :type locale: A GrampsLocale object.
         """
         if sort_handles:
-            sql = ("SELECT family.handle " +
-                   "FROM family " +
-                   "LEFT JOIN person AS father " +
-                   "ON family.father_handle = father.handle " +
-                   "LEFT JOIN person AS mother " +
-                   "ON family.mother_handle = mother.handle " +
-                   "ORDER BY (CASE WHEN father.handle IS NULL " +
-                   "THEN mother.surname " +
-                   "ELSE father.surname " +
-                   "END), " +
-                   "(CASE WHEN family.handle IS NULL " +
-                   "THEN mother.given_name " +
-                   "ELSE father.given_name " +
-                   "END) " +
-                   "COLLATE glocale")
+            if locale != glocale:
+                self.dbapi.check_collation(locale)
+
+            sql = ('SELECT family.handle ' +
+                   'FROM family ' +
+                   'LEFT JOIN person AS father ' +
+                   'ON family.father_handle = father.handle ' +
+                   'LEFT JOIN person AS mother ' +
+                   'ON family.mother_handle = mother.handle ' +
+                   'ORDER BY (CASE WHEN father.handle IS NULL ' +
+                   'THEN mother.surname ' +
+                   'ELSE father.surname ' +
+                   'END), ' +
+                   '(CASE WHEN family.handle IS NULL ' +
+                   'THEN mother.given_name ' +
+                   'ELSE father.given_name ' +
+                   'END) ' +
+                   'COLLATE "%s"' % locale.get_collation())
             self.dbapi.execute(sql)
         else:
             self.dbapi.execute("SELECT handle FROM family")
         rows = self.dbapi.fetchall()
-        return [bytes(row[0], "utf-8") for row in rows]
+        return [row[0] for row in rows]
 
     def get_event_handles(self):
         """
@@ -461,52 +465,73 @@ class DBAPI(DbGeneric):
         """
         self.dbapi.execute("SELECT handle FROM event")
         rows = self.dbapi.fetchall()
-        return [bytes(row[0], "utf-8") for row in rows]
+        return [row[0] for row in rows]
 
-    def get_citation_handles(self, sort_handles=False):
+    def get_citation_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Citation in
         the database.
 
-        If sort_handles is True, the list is sorted by Citation title.
+        :param sort_handles: If True, the list is sorted by Citation title.
+        :type sort_handles: bool
+        :param locale: The locale to use for collation.
+        :type locale: A GrampsLocale object.
         """
         if sort_handles:
-            self.dbapi.execute("SELECT handle FROM citation "
-                               "ORDER BY page COLLATE glocale")
+            if locale != glocale:
+                self.dbapi.check_collation(locale)
+
+            self.dbapi.execute('SELECT handle FROM citation '
+                               'ORDER BY page '
+                               'COLLATE "%s"' % locale.get_collation())
         else:
             self.dbapi.execute("SELECT handle FROM citation")
         rows = self.dbapi.fetchall()
-        return [bytes(row[0], "utf-8") for row in rows]
+        return [row[0] for row in rows]
 
-    def get_source_handles(self, sort_handles=False):
+    def get_source_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Source in
         the database.
 
-        If sort_handles is True, the list is sorted by Source title.
+        :param sort_handles: If True, the list is sorted by Source title.
+        :type sort_handles: bool
+        :param locale: The locale to use for collation.
+        :type locale: A GrampsLocale object.
         """
         if sort_handles:
-            self.dbapi.execute("SELECT handle FROM source "
-                               "ORDER BY title COLLATE glocale")
+            if locale != glocale:
+                self.dbapi.check_collation(locale)
+
+            self.dbapi.execute('SELECT handle FROM source '
+                               'ORDER BY title '
+                               'COLLATE "%s"' % locale.get_collation())
         else:
             self.dbapi.execute("SELECT handle from source")
         rows = self.dbapi.fetchall()
-        return [bytes(row[0], "utf-8") for row in rows]
+        return [row[0] for row in rows]
 
-    def get_place_handles(self, sort_handles=False):
+    def get_place_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Place in
         the database.
 
-        If sort_handles is True, the list is sorted by Place title.
+        :param sort_handles: If True, the list is sorted by Place title.
+        :type sort_handles: bool
+        :param locale: The locale to use for collation.
+        :type locale: A GrampsLocale object.
         """
         if sort_handles:
-            self.dbapi.execute("SELECT handle FROM place "
-                               "ORDER BY title COLLATE glocale")
+            if locale != glocale:
+                self.dbapi.check_collation(locale)
+
+            self.dbapi.execute('SELECT handle FROM place '
+                               'ORDER BY title '
+                               'COLLATE "%s"' % locale.get_collation())
         else:
             self.dbapi.execute("SELECT handle FROM place")
         rows = self.dbapi.fetchall()
-        return [bytes(row[0], "utf-8") for row in rows]
+        return [row[0] for row in rows]
 
     def get_repository_handles(self):
         """
@@ -515,22 +540,29 @@ class DBAPI(DbGeneric):
         """
         self.dbapi.execute("SELECT handle FROM repository")
         rows = self.dbapi.fetchall()
-        return [bytes(row[0], "utf-8") for row in rows]
+        return [row[0] for row in rows]
 
-    def get_media_handles(self, sort_handles=False):
+    def get_media_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Media in
         the database.
 
-        If sort_handles is True, the list is sorted by title.
+        :param sort_handles: If True, the list is sorted by title.
+        :type sort_handles: bool
+        :param locale: The locale to use for collation.
+        :type locale: A GrampsLocale object.
         """
         if sort_handles:
-            self.dbapi.execute("SELECT handle FROM media "
-                               "ORDER BY desc COLLATE glocale")
+            if locale != glocale:
+                self.dbapi.check_collation(locale)
+
+            self.dbapi.execute('SELECT handle FROM media '
+                               'ORDER BY desc '
+                               'COLLATE "%s"' % locale.get_collation())
         else:
             self.dbapi.execute("SELECT handle FROM media")
         rows = self.dbapi.fetchall()
-        return [bytes(row[0], "utf-8") for row in rows]
+        return [row[0] for row in rows]
 
     def get_note_handles(self):
         """
@@ -539,22 +571,29 @@ class DBAPI(DbGeneric):
         """
         self.dbapi.execute("SELECT handle FROM note")
         rows = self.dbapi.fetchall()
-        return [bytes(row[0], "utf-8") for row in rows]
+        return [row[0] for row in rows]
 
-    def get_tag_handles(self, sort_handles=False):
+    def get_tag_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Tag in
         the database.
 
-        If sort_handles is True, the list is sorted by Tag name.
+        :param sort_handles: If True, the list is sorted by Tag name.
+        :type sort_handles: bool
+        :param locale: The locale to use for collation.
+        :type locale: A GrampsLocale object.
         """
         if sort_handles:
-            self.dbapi.execute("SELECT handle FROM tag "
-                               "ORDER BY name COLLATE glocale")
+            if locale != glocale:
+                self.dbapi.check_collation(locale)
+
+            self.dbapi.execute('SELECT handle FROM tag '
+                               'ORDER BY name '
+                               'COLLATE "%s"' % locale.get_collation())
         else:
             self.dbapi.execute("SELECT handle FROM tag")
         rows = self.dbapi.fetchall()
-        return [bytes(row[0], "utf-8") for row in rows]
+        return [row[0] for row in rows]
 
     def get_tag_from_name(self, name):
         """
@@ -678,16 +717,14 @@ class DBAPI(DbGeneric):
                 transaction.add(REFERENCE_KEY, TXNDEL, key, old_data, None)
 
     def _do_remove(self, handle, transaction, obj_key):
-        if isinstance(handle, bytes):
-            handle = str(handle, "utf-8")
         if self.readonly or not handle:
             return
         if self.has_handle(obj_key, handle):
+            data = self.get_raw_data(obj_key, handle)
             table = KEY_TO_NAME_MAP[obj_key]
             sql = "DELETE FROM %s WHERE handle = ?" % table
             self.dbapi.execute(sql, [handle])
             if not transaction.batch:
-                data = self.get_raw_data(obj_key, handle)
                 transaction.add(obj_key, TXNDEL, handle, data, None)
 
     def find_backlink_handles(self, handle, include_classes=None):
@@ -707,8 +744,6 @@ class DBAPI(DbGeneric):
 
             result_list = list(find_backlink_handles(handle))
         """
-        if isinstance(handle, bytes):
-            handle = str(handle, "utf-8")
         self.dbapi.execute("SELECT obj_class, obj_handle "
                            "FROM reference "
                            "WHERE ref_handle = ?",
@@ -755,7 +790,7 @@ class DBAPI(DbGeneric):
             rows = cursor.fetchmany()
             while rows:
                 for row in rows:
-                    yield (row[0].encode('utf8'), pickle.loads(row[1]))
+                    yield (row[0], pickle.loads(row[1]))
                 rows = cursor.fetchmany()
 
     def _iter_raw_place_tree_data(self):
@@ -770,7 +805,7 @@ class DBAPI(DbGeneric):
             rows = self.dbapi.fetchall()
             for row in rows:
                 to_do.append(row[0])
-                yield (row[0].encode('utf8'), pickle.loads(row[1]))
+                yield (row[0], pickle.loads(row[1]))
 
     def reindex_reference_map(self, callback):
         """
@@ -821,8 +856,6 @@ class DBAPI(DbGeneric):
         self.genderStats = GenderStats(gstats)
 
     def has_handle(self, obj_key, handle):
-        if isinstance(handle, bytes):
-            handle = str(handle, "utf-8")
         table = KEY_TO_NAME_MAP[obj_key]
         sql = "SELECT 1 FROM %s WHERE handle = ?" % table
         self.dbapi.execute(sql, [handle])
@@ -842,8 +875,6 @@ class DBAPI(DbGeneric):
         return [row[0] for row in rows]
 
     def get_raw_data(self, obj_key, handle):
-        if isinstance(handle, bytes):
-            handle = str(handle, "utf-8")
         table = KEY_TO_NAME_MAP[obj_key]
         sql = "SELECT blob_data FROM %s WHERE handle = ?" % table
         self.dbapi.execute(sql, [handle])
@@ -920,17 +951,8 @@ class DBAPI(DbGeneric):
                     Citation, Media, Note, Tag):
             table_name = cls.__name__.lower()
             for field, schema_type, max_length in cls.get_secondary_fields():
-                sql_type = self._sql_type(schema_type, max_length)
-                try:
-                    # test to see if it exists:
-                    self.dbapi.execute("SELECT %s FROM %s LIMIT 1"
-                                       % (field, table_name))
-                    LOG.info("    Table %s, field %s is up to date",
-                             table_name, field)
-                except:
-                    # if not, let's add it
-                    LOG.info("    Table %s, field %s was added",
-                             table_name, field)
+                if field != 'handle':
+                    sql_type = self._sql_type(schema_type, max_length)
                     self.dbapi.execute("ALTER TABLE %s ADD COLUMN %s %s"
                                        % (table_name, field, sql_type))
 

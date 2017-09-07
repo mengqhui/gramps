@@ -172,50 +172,6 @@ def delete_tree(dir):
             % (dir, here, tmp))
     shutil.rmtree(sdir)
 
-# simplified logging
-# gramps-independent but gramps-compatible
-#
-# I don't see any need to inherit from logging.Logger
-# (at present, test code needs nothing fancy)
-# but that might be considered for future needs
-# NB: current code reflects limited expertise on the
-# uses of the logging module
-# ---------------------------------------------------------
-class TestLogger:
-    """this class mainly just encapsulates some globals
-    namely lfname, lfh  for a file log name and handle
-
-    provides simplified logging setup for test modules
-    that need to setup logging for modules under test
-    (just instantiate a TestLogger to avoid error
-     messages about logging handlers not available)
-
-    There is also a simple logfile capability, to allow
-    test modules to capture gramps logging output
-
-    Note that existing logging will still occur, possibly
-    resulting in console messages and popup dialogs
-    """
-    def __init__(self, lvl=logging.WARN):
-        logging.basicConfig(level=lvl)
-
-    def logfile_init(self, lfname):
-        """init or re-init a logfile"""
-        if getattr(self, "lfh", None):
-            logging.getLogger().handlers.remove(self.lfh)
-        if os.path.isfile(lfname):
-            os.unlink(lfname)
-        self.lfh = logging.FileHandler(lfname)
-        logging.getLogger().addHandler(self.lfh)
-        self.lfname = lfname
-
-    def logfile_getlines(self):
-        """get current content of logfile as list of lines"""
-        txt = []
-        if self.lfname and os.path.isfile(self.lfname):
-            txt = open(self.lfname).readlines()
-        return txt
-
 ### Support for testing CLI
 
 def new_exit(edit_code=None):
@@ -228,6 +184,9 @@ def capture(stdin, bytesio=False):
     if stdin:
         oldin = sys.stdin
         sys.stdin = stdin
+    logger = logging.getLogger()
+    old_level = logger.getEffectiveLevel()
+    logger.setLevel(logging.CRITICAL)
     try:
         output = [BytesIO() if bytesio else StringIO(), StringIO()]
         sys.stdout, sys.stderr = output
@@ -236,6 +195,7 @@ def capture(stdin, bytesio=False):
     except SystemExit:
         pass
     finally:
+        logger.setLevel(old_level)
         sys.stdout, sys.stderr = oldout, olderr
         sys.exit = oldexit
         if stdin:

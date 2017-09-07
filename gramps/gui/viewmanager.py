@@ -91,6 +91,12 @@ from .aboutdialog import GrampsAboutDialog
 from .navigator import Navigator
 from .views.tags import Tags
 from .actiongroup import ActionGroup
+from gramps.gen.lib import (Person, Surname, Family, Media, Note, Place,
+                            Source, Repository, Citation, Event, EventType,
+                            ChildRef)
+from gramps.gui.editors import (EditPerson, EditFamily, EditMedia, EditNote,
+                                EditPlace, EditSource, EditRepository,
+                                EditCitation, EditEvent)
 from gramps.gen.db.exceptions import DbWriteFailure
 from .managedwindow import ManagedWindow
 
@@ -101,6 +107,8 @@ from .managedwindow import ManagedWindow
 #-------------------------------------------------------------------------
 if is_quartz():
     try:
+        import gi
+        gi.require_version('GtkosxApplication', '1.0')
         from gi.repository import GtkosxApplication as QuartzApp
         _GTKOSXAPPLICATION = True
     except:
@@ -126,6 +134,23 @@ UIDEFAULT = '''<ui>
     <separator/>
     <menuitem action="Abandon"/>
     <menuitem action="Quit"/>
+  </menu>
+  <menu action="AddMenu">
+    <menu action="AddNewMenu">
+    <separator/>
+    <menuitem action="PersonAdd"/>
+    <separator/>
+    <menuitem action="FamilyAdd"/>
+    <separator/>
+    <menuitem action="EventAdd"/>
+    <separator/>
+    <menuitem action="PlaceAdd"/>
+    <menuitem action="SourceAdd"/>
+    <menuitem action="CitationAdd"/>
+    <menuitem action="RepositoryAdd"/>
+    <menuitem action="MediaAdd"/>
+    <menuitem action="NoteAdd"/>
+    </menu>
   </menu>
   <menu action="EditMenu">
     <menuitem action="Undo"/>
@@ -573,6 +598,27 @@ class ViewManager(CLIManager):
         self._action_action_list = [
             ('Clipboard', 'edit-paste', _('Clip_board'), "<PRIMARY>b",
              _("Open the Clipboard dialog"), self.clipboard),
+            ('AddMenu', None, _('_Add')),
+            ('AddNewMenu', None, _('New')),
+            ('PersonAdd', None, _('Person'), "<Alt>p", None,
+             self.add_new_person),
+            ('FamilyAdd', None, _('Family'), "<Alt>y", None,
+             self.add_new_family),
+            ('EventAdd', None, _('Event'), "<shift>e", None,
+             self.add_new_event),
+            ('PlaceAdd', None, _('Place'), "<shift><Alt>p", None,
+             self.add_new_place),
+            ('SourceAdd', None, _('Source'), "<shift><Alt>s", None,
+             self.add_new_source),
+            ('CitationAdd', None, _('Citation'), "<shift><Alt>c", None,
+             self.add_new_citation),
+            ('RepositoryAdd', None, _('Repository'), "<shift><Alt>y", None,
+             self.add_new_repository),
+            ('MediaAdd', None, _('Media'), "<shift><Alt>m", None,
+             self.add_new_media),
+            ('NoteAdd', None, _('Note'), "<shift><Alt>n", None,
+             self.add_new_note),
+            #--------------------------------------
             ('Import', 'gramps-import', _('_Import...'), "<PRIMARY>i", None,
              self.import_data),
             ('Tools', 'gramps-tools', _('_Tools'), None,
@@ -1132,7 +1178,8 @@ class ViewManager(CLIManager):
                 self.dbstate.db.close(user=self.user)
             (filename, title) = value
             self.db_loader.read_file(filename)
-            self._post_load_newdb(filename, 'x-directory/normal', title)
+            if self.dbstate.db.is_open():
+                self._post_load_newdb(filename, 'x-directory/normal', title)
         else:
             if dialog.after_change != "":
                 # We change the title of the main window.
@@ -1353,6 +1400,87 @@ class ViewManager(CLIManager):
             ClipboardWindow(self.dbstate, self.uistate)
         except WindowActiveError:
             return
+
+    # ---------------Add new xxx --------------------------------
+    def add_new_person(self, obj):
+        """
+        Add a new person to the database.  (Global keybinding)
+        """
+        person = Person()
+        #the editor requires a surname
+        person.primary_name.add_surname(Surname())
+        person.primary_name.set_primary_surname(0)
+
+        try:
+            EditPerson(self.dbstate, self.uistate, [], person)
+        except WindowActiveError:
+            pass
+
+    def add_new_family(self, obj):
+        """
+        Add a new family to the database.  (Global keybinding)
+        """
+        family = Family()
+        try:
+            EditFamily(self.dbstate, self.uistate, [], family)
+        except WindowActiveError:
+            pass
+
+    def add_new_event(self, obj):
+        """
+        Add a new custom/unknown event (Note you type first letter of event)
+        """
+        try:
+            event = Event()
+            event.set_type(EventType.UNKNOWN)
+            EditEvent(self.dbstate, self.uistate, [], event)
+        except WindowActiveError:
+            pass
+
+    def add_new_place(self, obj):
+        """Add a new place to the place list"""
+        try:
+            EditPlace(self.dbstate, self.uistate, [], Place())
+        except WindowActiveError:
+            pass
+
+    def add_new_source(self, obj):
+        """Add a new source to the source list"""
+        try:
+            EditSource(self.dbstate, self.uistate, [], Source())
+        except WindowActiveError:
+            pass
+
+    def add_new_repository(self, obj):
+        """Add a new repository to the repository list"""
+        try:
+            EditRepository(self.dbstate, self.uistate, [], Repository())
+        except WindowActiveError:
+            pass
+
+    def add_new_citation(self, obj):
+        """
+        Add a new citation
+        """
+        try:
+            EditCitation(self.dbstate, self.uistate, [], Citation())
+        except WindowActiveError:
+            pass
+
+    def add_new_media(self, obj):
+        """Add a new media object to the media list"""
+        try:
+            EditMedia(self.dbstate, self.uistate, [], Media())
+        except WindowActiveError:
+            pass
+
+    def add_new_note(self, obj):
+        """Add a new note to the note list"""
+        try:
+            EditNote(self.dbstate, self.uistate, [], Note())
+        except WindowActiveError:
+            pass
+    # ------------------------------------------------------------------------
 
     def config_view(self, obj):
         """

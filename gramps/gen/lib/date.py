@@ -703,16 +703,24 @@ class Date:
         """
         return {
             "type": "object",
+            "title": _("Date"),
             "properties": {
                 "_class": {"enum": [cls.__name__]},
-                "calendar": {"type": "integer"},
-                "modifier": {"type": "integer"},
-                "quality": {"type": "integer"},
+                "calendar": {"type": "integer",
+                             "title": _("Calendar")},
+                "modifier": {"type": "integer",
+                             "title": _("Modifier")},
+                "quality": {"type": "integer",
+                            "title": _("Quality")},
                 "dateval": {"type": "array",
+                            "title": _("Values"),
                             "items": {"type": ["integer", "boolean"]}},
-                "text": {"type": "string"},
-                "sortval": {"type": "integer"},
-                "newyear": {"type": "integer"}
+                "text": {"type": "string",
+                         "title": _("Text")},
+                "sortval": {"type": "integer",
+                            "title": _("Sort value")},
+                "newyear": {"type": "integer",
+                            "title": _("New year begins")}
             }
         }
 
@@ -1765,9 +1773,9 @@ class Date:
         """
         Return True if the date contains no information (empty text).
         """
-        return (self.modifier == Date.MOD_TEXTONLY and not self.text) or \
-               (self.get_start_date() == Date.EMPTY
-                and self.get_stop_date() == Date.EMPTY)
+        return not((self.modifier == Date.MOD_TEXTONLY and self.text)
+               or self.get_start_date() != Date.EMPTY
+                or self.get_stop_date() != Date.EMPTY)
 
     def is_compound(self):
         """

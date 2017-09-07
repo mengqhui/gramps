@@ -143,7 +143,7 @@ class IndivCompleteReport(Report):
 
         self.use_attrs = menu.get_option_by_name('incl_attrs').get_value()
         self.use_census = menu.get_option_by_name('incl_census').get_value()
-        self.use_gramps_id = menu.get_option_by_name('grampsid').get_value()
+        self.use_gramps_id = menu.get_option_by_name('inc_id').get_value()
         self.use_images = menu.get_option_by_name('images').get_value()
         self.use_notes = menu.get_option_by_name('incl_notes').get_value()
         self.use_srcs = menu.get_option_by_name('cites').get_value()
@@ -166,6 +166,7 @@ class IndivCompleteReport(Report):
 
         self.bibli = None
         self.family_notes_list = []
+        self.names_notes_list = []
         self.mime0 = None
         self.person = None
 
@@ -227,6 +228,8 @@ class IndivCompleteReport(Report):
         for notehandle in event.get_note_list():
             note = self._db.get_note_from_handle(notehandle)
             text = note.get_styledtext()
+            if self.use_gramps_id:
+                text = text + ' [%s]' % note.get_gramps_id()
             note_format = note.get_format()
             self.doc.write_styled_note(
                 text, note_format, 'IDS-Normal',
@@ -253,6 +256,10 @@ class IndivCompleteReport(Report):
         """ write a note """
         notelist = self.person.get_note_list()
         notelist += self.family_notes_list
+        if self.names_notes_list:
+            for note_handle in self.names_notes_list:
+                if note_handle not in notelist:
+                    notelist += [note_handle]
         if not notelist or not self.use_notes:
             return
         self.doc.start_table('note', 'IDS-IndTable')
@@ -265,6 +272,8 @@ class IndivCompleteReport(Report):
         for notehandle in notelist:
             note = self._db.get_note_from_handle(notehandle)
             text = note.get_styledtext()
+            if self.use_gramps_id:
+                text = text + ' [%s]' % note.get_gramps_id()
             note_format = note.get_format()
             self.doc.start_row()
             self.doc.start_cell('IDS-NormalCell', 2)
@@ -370,7 +379,8 @@ class IndivCompleteReport(Report):
     def write_alt_names(self):
         """ write any alternate names of the person """
 
-        if len(self.person.get_alternate_names()) < 1:
+        alt_names = self.person.get_alternate_names()
+        if len(alt_names) < 1:
             return
 
         self.doc.start_table("altnames", "IDS-IndTable")
@@ -381,7 +391,8 @@ class IndivCompleteReport(Report):
         self.doc.end_cell()
         self.doc.end_row()
 
-        for name in self.person.get_alternate_names():
+        for name in alt_names:
+            self.names_notes_list += name.get_note_list()
             name_type = self._(self._get_type(name.get_type()))
             self.doc.start_row()
             self.write_cell(name_type)
@@ -804,7 +815,8 @@ class IndivCompleteReport(Report):
 
     def write_report(self):
         """ write the report """
-        plist = self._db.get_person_handles(sort_handles=True)
+        plist = self._db.get_person_handles(sort_handles=True,
+                                            locale=self._locale)
         if self.filter:
             ind_list = self.filter.apply(self._db, plist, user=self._user)
         else:
@@ -1108,9 +1120,7 @@ class IndivCompleteOptions(MenuReportOptions):
         category_name = _("Include (2)")
         ################################
 
-        grampsid = BooleanOption(_("Gramps ID"), False)
-        grampsid.set_help(_("Whether to include Gramps ID next to names."))
-        menu.add_option(category_name, "grampsid", grampsid)
+        stdoptions.add_gramps_id_option(menu, category_name)
 
         tags = BooleanOption(_("Include Tags"), True)
         tags.set_help(_("Whether to include tags."))

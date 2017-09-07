@@ -101,7 +101,7 @@ class FamilyGroup(Report):
 
         get_option_by_name = menu.get_option_by_name
         get_value = lambda name: get_option_by_name(name).get_value()
-        self.gramps_ids = get_value('gramps_ids')
+        self.gramps_ids = get_value('inc_id')
         self.recursive = get_value('recursive')
         self.missing_info = get_value('missinginfo')
         self.generations = get_value('generations')
@@ -660,7 +660,8 @@ class FamilyGroup(Report):
                         self.dump_family(child_family_handle, (generation+1))
 
     def write_report(self):
-        flist = self.db.get_family_handles(sort_handles=True)
+        flist = self.db.get_family_handles(sort_handles=True,
+                                           locale=self._locale)
         if not self.filter:
             fam_list = flist
         else:
@@ -774,8 +775,11 @@ class FamilyGroupOptions(MenuReportOptions):
         add_option("incParNames", inc_par_names)
 
         ##########################
-        add_option = partial(menu.add_option, _("Include (2)"))
+        category_name = _("Include (2)")
+        add_option = partial(menu.add_option, category_name)
         ##########################
+
+        stdoptions.add_gramps_id_option(menu, category_name)
 
         inc_fam_notes = BooleanOption(_("Family Notes"), False)
         inc_fam_notes.set_help(_("Whether to include notes for families."))
@@ -790,10 +794,6 @@ class FamilyGroupOptions(MenuReportOptions):
         inc_chi_mar.set_help(
             _("Whether to include marriage information for children."))
         add_option("incChiMar", inc_chi_mar)
-
-        gramps_ids = BooleanOption(_('Gramps ID'), False)
-        gramps_ids.set_help(_("Whether to include Gramps ID next to names."))
-        add_option("gramps_ids", gramps_ids)
 
         self.__generations = BooleanOption(_("Generation numbers "
                                              "(recursive only)"), False)

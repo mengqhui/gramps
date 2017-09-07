@@ -38,6 +38,7 @@ import types
 from ..db.base import DbReadBase, DbWriteBase
 from ..lib import (Citation, Event, Family, Media, Note, Person, Place,
                    Repository, Source, Tag)
+from ..const import GRAMPS_LOCALE as glocale
 
 class ProxyCursor:
     """
@@ -58,7 +59,7 @@ class ProxyCursor:
 
     def __iter__(self):
         for handle in self.get_handles():
-            yield bytes(handle, "utf-8"), self.get_raw(handle)
+            yield handle, self.get_raw(handle)
 
 class ProxyMap:
     """
@@ -75,7 +76,7 @@ class ProxyMap:
 
     def keys(self):
         """ return the keys """
-        return [bytes(key, "utf-8") for key in self.get_keys()]
+        return self.get_keys()
 
 class ProxyDbBase(DbReadBase):
     """
@@ -199,27 +200,29 @@ class ProxyDbBase(DbReadBase):
         return ProxyCursor(self.get_raw_tag_data,
                            self.get_tag_handles)
 
-    def get_person_handles(self, sort_handles=False):
+    def get_person_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Person in
         the database. If sort_handles is True, the list is sorted by surnames
         """
         if (self.db is not None) and self.db.is_open():
             proxied = set(self.iter_person_handles())
-            all = self.basedb.get_person_handles(sort_handles=sort_handles)
-            return [hdl for hdl in all if str(hdl, 'utf-8') in proxied]
+            all = self.basedb.get_person_handles(sort_handles=sort_handles,
+                                                 locale=locale)
+            return [hdl for hdl in all if hdl in proxied]
         else:
             return []
 
-    def get_family_handles(self, sort_handles=False):
+    def get_family_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Family in
         the database. If sort_handles is True, the list is sorted by surnames
         """
         if (self.db is not None) and self.db.is_open():
             proxied = set(self.iter_family_handles())
-            all = self.basedb.get_family_handles(sort_handles=sort_handles)
-            return [hdl for hdl in all if str(hdl, 'utf-8') in proxied]
+            all = self.basedb.get_family_handles(sort_handles=sort_handles,
+                                                 locale=locale)
+            return [hdl for hdl in all if hdl in proxied]
         else:
             return []
 
@@ -233,7 +236,7 @@ class ProxyDbBase(DbReadBase):
         else:
             return []
 
-    def get_source_handles(self, sort_handles=False):
+    def get_source_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Source in
         the database.
@@ -243,7 +246,7 @@ class ProxyDbBase(DbReadBase):
         else:
             return []
 
-    def get_citation_handles(self, sort_handles=False):
+    def get_citation_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Citation in
         the database.
@@ -253,7 +256,7 @@ class ProxyDbBase(DbReadBase):
         else:
             return []
 
-    def get_place_handles(self, sort_handles=False):
+    def get_place_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Place in
         the database.
@@ -263,7 +266,7 @@ class ProxyDbBase(DbReadBase):
         else:
             return []
 
-    def get_media_handles(self, sort_handles=False):
+    def get_media_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Media in
         the database.
@@ -293,7 +296,7 @@ class ProxyDbBase(DbReadBase):
         else:
             return []
 
-    def get_tag_handles(self, sort_handles=False):
+    def get_tag_handles(self, sort_handles=False, locale=glocale):
         """
         Return a list of database handles, one handle for each Tag in
         the database.

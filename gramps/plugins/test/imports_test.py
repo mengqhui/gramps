@@ -25,6 +25,7 @@ import unittest
 import os
 import sys
 import re
+import locale
 from time import localtime, strptime
 from unittest.mock import patch
 #import logging
@@ -49,6 +50,9 @@ TEST_DIR = os.path.abspath(os.path.join(DATA_DIR, "tests"))
 #  Local Functions
 # ------------------------------------------------------------------
 
+# These tests assume a US date and time format.
+locale.setlocale(locale.LC_ALL, 'en_US.utf8')
+
 def mock_time(*args):
     """
     Mock up a dummy to replace the varying 'time string results'
@@ -61,7 +65,7 @@ def mock_localtime(*args):
     """
     return strptime("25 Dec 1999", "%d %b %Y")
 
-class CompleteCheck(unittest.TestCase):
+class TestImports(unittest.TestCase):
     """The test class cases will be dynamically created at import time from
     files to be tested.  The following defs are used by the test cases
     """
@@ -194,10 +198,12 @@ def make_tst_function(tstfile, file_name):
     @patch('gramps.plugins.db.bsddb.write.time')
     @patch('gramps.gen.utils.unknown.localtime')
     @patch('gramps.gen.utils.unknown.time')
-    def tst(self, mocktime, mockltime, mockwtime, mockdtime):
+    @patch('time.localtime')
+    def tst(self, mockptime, mocktime, mockltime, mockwtime, mockdtime):
         """ This compares the import file with the expected result '.gramps'
         file.
         """
+        mockptime.side_effect = mock_localtime
         mocktime.side_effect = mock_time
         mockltime.side_effect = mock_localtime
         mockwtime.side_effect = mock_time
@@ -278,39 +284,27 @@ if __name__ == "__main__":
             del sys.argv[i]
             del sys.argv[i]
 # The following code dynamically creates the methods for each test file.
-# The methods are inserted at load time into the 'CompleteCheck' class
+# The methods are inserted at load time into the 'TestImports' class
 # via the modules' globals, taking advantage that they are a dict.
 if _tstfile:                             # single file mode
     (fname, ext) = os.path.splitext(os.path.basename(_tstfile))
     test_func = make_tst_function(_tstfile, fname)
-    clname = 'Import_{0}'.format(_tstfile)
-    globals()[clname] = type(clname,
-                             (CompleteCheck,),
-                             {"testit": test_func})
+    tname = "test_" + _tstfile.replace("-", "_").replace(".", "_")
+    test_func.__name__ = tname
+    test_func.__doc__ = tname
+    setattr(TestImports, tname, test_func)
 else:
-    _tstfiles = []
     for _tstfile in os.listdir(TEST_DIR):
         (fname, ext) = os.path.splitext(os.path.basename(_tstfile))
         if _tstfile != "SAMPLE.DEF" and (ext in (".gramps", ".difs", ".bak") \
                 or not fname.startswith("imp_")):
             continue
         test_func = make_tst_function(_tstfile, fname)
-        clname = 'Import_{0}'.format(_tstfile)
-        globals()[clname] = type(clname,
-                                 (CompleteCheck,),
-                                 {"testit": test_func})
-        _tstfiles.append(clname)
-
-    def test_import_classes():
-        """
-        Dynamic Test-function lister for
-        nosetests. Creates an instance for each
-        import test, and yields the function to
-        test.
-        """
-        for clname in _tstfiles:
-            instance = globals()[clname]()
-            yield instance.testit
+        tname = "test_" + _tstfile.replace("-", "_").replace(".", "_")
+        test_func.__name__ = tname
+        test_func.__doc__ = tname
+        setattr(TestImports, tname, test_func)
+    test_func = None  # keep nosetest from finding last one again
 
 if __name__ == "__main__":
     unittest.main()

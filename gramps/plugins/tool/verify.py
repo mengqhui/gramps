@@ -365,7 +365,7 @@ class Verify(tool.Tool, ManagedWindow, UpdateCallback):
 
         try:
             self.v_r = VerifyResults(self.dbstate, self.uistate, self.track,
-                                     self.top)
+                                     self.top, self.close)
             self.add_results = self.v_r.add_results
             self.v_r.load_ignored(self.db.full_name)
         except WindowActiveError:
@@ -435,6 +435,9 @@ class Verify(tool.Tool, ManagedWindow, UpdateCallback):
                 Disconnected(self.db, person),
                 InvalidBirthDate(self.db, person, invdate),
                 InvalidDeathDate(self.db, person, invdate),
+                BirthEqualsDeath(self.db, person),
+                BirthEqualsMarriage(self.db, person),
+                DeathEqualsMarriage(self.db, person),
                 ]
 
             for rule in rule_list:
@@ -494,24 +497,22 @@ class VerifyResults(ManagedWindow):
     TRUE_COL = 8
     SHOW_COL = 9
 
-    def __init__(self, dbstate, uistate, track, glade):
+    def __init__(self, dbstate, uistate, track, glade, closeall):
         """ initialize things """
         self.title = _('Data Verification Results')
 
         ManagedWindow.__init__(self, uistate, track, self.__class__)
 
         self.dbstate = dbstate
+        self.closeall = closeall
         self._set_filename()
         self.top = glade
         window = self.top.get_object("verify_result")
         self.set_window(window, self.top.get_object('title2'), self.title)
         self.setup_configs('interface.verifyresults', 500, 300)
-
-        self.top.connect_signals({
-            "destroy_passed_object"  : self.close,
-            "on_verify_ok_clicked"   : self.__dummy,
-            "on_help_clicked"        : self.__dummy,
-            })
+        window.connect("close", self.close)
+        close_btn = self.top.get_object("closebutton1")
+        close_btn.connect("clicked", self.close)
 
         self.warn_tree = self.top.get_object('warn_tree')
         self.warn_tree.connect('button_press_event', self.double_click)
@@ -584,12 +585,6 @@ class VerifyResults(ManagedWindow):
         self.show()
         self.window_shown = False
 
-    def __dummy(self, obj):
-        """dummy callback, needed because VerifyResults is in same glade file
-        as Verify, so callbacks of Verify must be defined.
-        """
-        pass
-
     def _set_filename(self):
         """ set the file where people who will be ignored will be kept """
         db_filename = self.dbstate.db.get_save_path()
@@ -661,6 +656,7 @@ class VerifyResults(ManagedWindow):
         self.save_ignored(new_ignores)
 
         ManagedWindow.close(self, *obj)
+        self.closeall()
 
     def hide_toggled(self, button):
         if button.get_active():
@@ -1787,4 +1783,56 @@ class OldAgeButNoDeath(PersonRule):
     def get_message(self):
         """ return the rule's error message """
         return _("Old age but no death")
+
+class BirthEqualsDeath(PersonRule):
+    """ test if a person's birth date is the same as their death date """
+    ID = 33
+    SEVERITY = Rule.ERROR
+    def broken(self):
+        """ return boolean indicating whether this rule is violated """
+        birth_date = get_birth_date(self.db, self.obj)
+        death_date = get_death_date(self.db, self.obj)
+        birth_ok = birth_date > 0 if birth_date is not None else False
+        death_ok = death_date > 0 if death_date is not None else False
+        return death_ok and birth_ok and birth_date == death_date
+
+    def get_message(self):
+        """ return the rule's error message """
+        return _("Birth equals death")
+
+class BirthEqualsMarriage(PersonRule):
+    """ test if a person's birth date is the same as their marriage date """
+    ID = 34
+    SEVERITY = Rule.ERROR
+    def broken(self):
+        """ return boolean indicating whether this rule is violated """
+        birth_date = get_birth_date(self.db, self.obj)
+        birth_ok = birth_date > 0 if birth_date is not None else False
+        for fhandle in self.obj.get_family_handle_list():
+            family = self.db.get_family_from_handle(fhandle)
+            marr_date = get_marriage_date(self.db, family)
+            marr_ok = marr_date > 0 if marr_date is not None else False
+            return marr_ok and birth_ok and birth_date == marr_date
+
+    def get_message(self):
+        """ return the rule's error message """
+        return _("Birth equals marriage")
+
+class DeathEqualsMarriage(PersonRule):
+    """ test if a person's death date is the same as their marriage date """
+    ID = 35
+    SEVERITY = Rule.WARNING # it's possible
+    def broken(self):
+        """ return boolean indicating whether this rule is violated """
+        death_date = get_death_date(self.db, self.obj)
+        death_ok = death_date > 0 if death_date is not None else False
+        for fhandle in self.obj.get_family_handle_list():
+            family = self.db.get_family_from_handle(fhandle)
+            marr_date = get_marriage_date(self.db, family)
+            marr_ok = marr_date > 0 if marr_date is not None else False
+            return marr_ok and death_ok and death_date == marr_date
+
+    def get_message(self):
+        """ return the rule's error message """
+        return _("Death equals marriage")
 

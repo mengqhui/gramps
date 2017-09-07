@@ -251,6 +251,7 @@ gramps/gen/filters/rules/place/_matchesfilter.py
 gramps/gen/filters/rules/place/_matchessourceconfidence.py
 gramps/gen/filters/rules/place/_placeprivate.py
 gramps/gen/filters/rules/place/_regexpidof.py
+gramps/gen/filters/rules/place/_withinarea.py
 gramps/gen/filters/rules/repository/_allrepos.py
 gramps/gen/filters/rules/repository/_changedsince.py
 gramps/gen/filters/rules/repository/_hasidof.py
@@ -545,6 +546,7 @@ gramps/gui/widgets/grampletpane.py
 gramps/gui/widgets/labels.py
 gramps/gui/widgets/monitoredwidgets.py
 gramps/gui/widgets/photo.py
+gramps/gui/widgets/placewithin.py
 gramps/gui/widgets/progressdialog.py
 gramps/gui/widgets/reorderfam.py
 gramps/gui/widgets/styledtextbuffer.py
@@ -631,6 +633,7 @@ gramps/plugins/importer/importgedcom.py
 gramps/plugins/importer/importgeneweb.py
 gramps/plugins/importer/importgpkg.py
 gramps/plugins/importer/importgrdb.py
+gramps/plugins/importer/importprogen.glade
 gramps/plugins/importer/importprogen.py
 gramps/plugins/importer/importvcard.py
 gramps/plugins/importer/importxml.py
@@ -644,6 +647,7 @@ gramps/plugins/lib/libnarrate.py
 gramps/plugins/lib/libpersonview.py
 gramps/plugins/lib/libplaceview.py
 gramps/plugins/lib/libplugins.gpr.py
+gramps/plugins/lib/libprogen.py
 gramps/plugins/lib/librecords.py
 gramps/plugins/lib/libsubstkeyword.py
 #gramps/plugins/lib/libtranslate.py
@@ -719,6 +723,7 @@ gramps/plugins/tool/relcalc.glade
 gramps/plugins/tool/relcalc.py
 gramps/plugins/tool/removeunused.glade
 gramps/plugins/tool/removeunused.py
+gramps/plugins/tool/reorderids.glade
 gramps/plugins/tool/reorderids.py
 gramps/plugins/tool/sortevents.py
 gramps/plugins/tool/testcasegenerator.py

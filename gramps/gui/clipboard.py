@@ -38,6 +38,8 @@ from gi.repository import GObject
 from gi.repository import Gdk
 from gi.repository import Gtk
 from gi.repository import GdkPixbuf
+from gi.repository import Pango
+import cairo
 
 #-------------------------------------------------------------------------
 #
@@ -117,6 +119,7 @@ def map2class(target):
          'place-link': ClipPlace,
          'placeref': ClipPlaceRef,
          'note-link': ClipNote,
+         'TEXT': ClipText,
          }
     return d[target] if target in d else None
 
@@ -1018,6 +1021,7 @@ class ClipboardListView:
 
         self._widget.connect('drag-data-get', self.object_drag_data_get)
         self._widget.connect('drag-begin', self.object_drag_begin)
+        self._widget.connect_after('drag-begin', self.object_after_drag_begin)
         self._widget.connect('drag-data-received',
                              self.object_drag_data_received)
         self._widget.connect('drag-end', self.object_drag_end)
@@ -1203,6 +1207,34 @@ class ClipboardListView:
         """ Handle the beginning of a drag operation. """
         pass
 
+    def object_after_drag_begin(self, widget, drag_context):
+        tree_selection = widget.get_selection()
+        model, paths = tree_selection.get_selected_rows()
+        if len(paths) == 1:
+            path = paths[0]
+            node = model.get_iter(path)
+            target = model.get_value(node, 0)
+            if target == "TEXT":
+                layout = widget.create_pango_layout(model.get_value(node,4))
+                layout.set_alignment(Pango.Alignment.CENTER)
+                width, height = layout.get_pixel_size()
+                surface = cairo.ImageSurface(cairo.FORMAT_RGB24,
+                                                  width, height)
+                ctx = cairo.Context(surface)
+                style_ctx = self._widget.get_style_context()
+                Gtk.render_background(style_ctx, ctx, 0, 0, width, height)
+                ctx.save()
+                Gtk.render_layout(style_ctx, ctx, 0, 0 , layout)
+                ctx.restore()
+                Gtk.drag_set_icon_surface(drag_context, surface)
+            else:
+                try:
+                    if map2class(target):
+                        Gtk.drag_set_icon_pixbuf(drag_context,
+                                                 map2class(target).ICON, 0, 0)
+                except:
+                    Gtk.drag_set_icon_default(drag_context)
+
     def object_drag_end(self, widget, drag_context):
         """ Handle the end of a drag operation. """
         pass
@@ -1218,7 +1250,10 @@ class ClipboardListView:
             path = paths[0]
             node = model.get_iter(path)
             o = model.get_value(node,1)
-            sel_data.set(tgs[0], 8, o.pack())
+            if model.get_value(node, 0) == 'TEXT':
+                sel_data.set_text(o._value, -1)
+            else:
+                sel_data.set(tgs[0], 8, o.pack())
         elif len(paths) > 1:
             raw_list = []
             for path in paths:
@@ -1279,54 +1314,57 @@ class ClipboardListView:
         # Just select the first match.
         wrapper_class = self._target_type_to_wrapper_class_map[
                                                     str(possible_wrappers[0])]
-        o = wrapper_class(self.dbstate, sel_data)
-        if title:
-            o._title = title
-        if value:
-            o._value = value
-        if dbid:
-            o._dbid = dbid
-        if dbname:
-            o._dbname = dbname
+        try:
+            o = wrapper_class(self.dbstate, sel_data)
+            if title:
+                o._title = title
+            if value:
+                o._value = value
+            if dbid:
+                o._dbid = dbid
+            if dbname:
+                o._dbname = dbname
 
-        # If the wrapper object is a subclass of ClipDropList then
-        # the drag data was a list of objects and we need to decode
-        # all of them.
-        if isinstance(o,ClipDropList):
-            o_list = o.get_objects()
-        else:
-            o_list = [o]
-        for o in o_list:
-            if o.__class__.DRAG_TARGET is None:
-                continue
-            data = [o.__class__.DRAG_TARGET.drag_type, o, None,
-                    o._type, o._value, o._dbid, o._dbname]
-            contains = model_contains(model, data)
-            if ((context.action if hasattr(context, "action") else context.get_actions())
-                != Gdk.DragAction.MOVE) and contains:
-                continue
-            drop_info = widget.get_dest_row_at_pos(x, y)
-            if drop_info:
-                path, position = drop_info
-                node = model.get_iter(path)
-                if (position == Gtk.TreeViewDropPosition.BEFORE
-                    or position == Gtk.TreeViewDropPosition.INTO_OR_BEFORE):
-                    model.insert_before(node, data)
-                else:
-                    model.insert_after(node, data)
+            # If the wrapper object is a subclass of ClipDropList then
+            # the drag data was a list of objects and we need to decode
+            # all of them.
+            if isinstance(o,ClipDropList):
+                o_list = o.get_objects()
             else:
-                model.append(data)
+                o_list = [o]
+            for o in o_list:
+                if o.__class__.DRAG_TARGET is None:
+                    continue
+                data = [o.__class__.DRAG_TARGET.drag_type, o, None,
+                        o._type, o._value, o._dbid, o._dbname]
+                contains = model_contains(model, data)
+                if ((context.action if hasattr(context, "action") else context.get_actions())
+                    != Gdk.DragAction.MOVE) and contains:
+                    continue
+                drop_info = widget.get_dest_row_at_pos(x, y)
+                if drop_info:
+                    path, position = drop_info
+                    node = model.get_iter(path)
+                    if (position == Gtk.TreeViewDropPosition.BEFORE
+                        or position == Gtk.TreeViewDropPosition.INTO_OR_BEFORE):
+                        model.insert_before(node, data)
+                    else:
+                        model.insert_after(node, data)
+                else:
+                    model.append(data)
 
-        # FIXME: there is one bug here: if you multi-select and drop
-        # on self, then it moves the first, and copies the rest.
+            # FIXME: there is one bug here: if you multi-select and drop
+            # on self, then it moves the first, and copies the rest.
 
-        if ((context.action if hasattr(context, "action") else context.get_actions()) ==
-            Gdk.DragAction.MOVE):
-            context.finish(True, True, time)
+            if ((context.action if hasattr(context, "action") else context.get_actions()) ==
+                Gdk.DragAction.MOVE):
+                context.finish(True, True, time)
 
-        # remember time for double drop workaround.
-        self._previous_drop_time = realTime
-        return o_list
+            # remember time for double drop workaround.
+            self._previous_drop_time = realTime
+            return o_list
+        except EOFError:
+            return None
 
     # proxy methods to provide access to the real widget functions.
 

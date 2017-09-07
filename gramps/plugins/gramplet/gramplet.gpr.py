@@ -24,7 +24,7 @@ from gramps.gen.plug._pluginreg import register, STABLE, UNSTABLE, GRAMPLET
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 _ = glocale.translation.gettext
 
-MODULE_VERSION="5.0"
+MODULE_VERSION="5.1"
 
 #------------------------------------------------------------------------
 #
@@ -1271,7 +1271,7 @@ register(GRAMPLET,
          gramps_target_version=MODULE_VERSION,
          status = UNSTABLE,
          fname="leak.py",
-         height=200,
+         height=400,
          gramplet = 'Leak',
          gramplet_title="Uncollected Objects",
          )
